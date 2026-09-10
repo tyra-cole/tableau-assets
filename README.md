@@ -1,2 +1,2 @@
 # tableau-assets
-Resources for DV2 dashboard
+Resources to use to spice up Tableau dashboards.
