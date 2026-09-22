@@ -6,22 +6,43 @@
   <title>Color Transition</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-    }
-
-    body {
-      animation: colorCycle 3s ease-in-out infinite;
-    }
-
-    @keyframes colorCycle {
-      0%   { background-color: #A00C0B; }
-      50%  { background-color: #E97132; }
-      100% { background-color: #A00C0B; }
-    }
+    html, body { width: 100%; height: 100%; }
   </style>
 </head>
-<body></body>
+<body>
+<script>
+  const colors = [
+    { h: 1,  s: 87, l: 34 },  // #A00C0B
+    { h: 14, s: 85, l: 62 },  // #F0724C
+    { h: 44, s: 89, l: 58 },  // #F3BF36
+  ];
+
+  const cycleDuration = 3000; // ms for full loop
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  function easeInOut(t) { return t < 0.5 ? 2*t*t : -1 + (4 - 2*t)*t; }
+
+  function animate() {
+    const t = (performance.now() % cycleDuration) / cycleDuration;
+    const n = colors.length;
+    const segment = t * n;
+    const idx = Math.floor(segment) % n;
+    const next = (idx + 1) % n;
+    const localT = easeInOut(segment - Math.floor(segment));
+
+    const c1 = colors[idx];
+    const c2 = colors[next];
+
+    const h = lerp(c1.h, c2.h, localT);
+    const s = lerp(c1.s, c2.s, localT);
+    const l = lerp(c1.l, c2.l, localT);
+
+    document.body.style.backgroundColor = `hsl(${h}, ${s}%, ${l}%)`;
+    requestAnimationFrame(animate);
+  }
+
+  requestAnimationFrame(animate);
+</script>
+</body>
 </html>
