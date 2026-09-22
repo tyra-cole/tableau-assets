@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Color Transition</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      animation: colorCycle 3s ease-in-out infinite;
+    }
+
+    @keyframes colorCycle {
+      0%   { background-color: #A00C0B; }
+      33%  { background-color: #F0724C; }
+      66%  { background-color: #F3BF36; }
+      100% { background-color: #A00C0B; }
+    }
+  </style>
+</head>
+<body></body>
+</html>
