@@ -14,7 +14,19 @@
                 'Detective Assigned (Badge)', 'Unit Assigned', 'PSF', 'CSFs',
                 'Federal Charges Filed', 'Federal Offense'],
       drop: ['Blank', 'OFFENSE_RAW'],
-      trimTime: ['Submission Date']
+           trimTime: ['Submission Date']
+    },
+    'Highlight Table': {
+      matrix: {
+        rows: 'Offense',                 // field on Rows
+        cols: 'Factor',                  // field on Columns
+        value: '% of Offense',           // measure shown in the cells
+        corner: 'Offense',               // header of the first column
+        rowOrder: ['Business Robbery', 'Individual Robbery', 'Kidnapping/Unlawful Restraint',
+                   'Murder/Manslaughter', 'Sex Assault FV', 'Sex Assault NFV', 'Other'],
+        colOrder: ['Witness', 'Video', 'Suspect Surrendered/Stayed at Scene', 'ALPR', 'Intel',
+                   'CDRs', 'Social Media', 'Phone Extraction', 'NIBIN']
+      }
     }
   };
 
@@ -42,9 +54,47 @@
     return AGG.test(col.fieldName) || col.dataType === 'int' || col.dataType === 'float';
   }
 
+  // Grid (Offense x Factor). Fields are matched by name (case-insensitive, "Calc:"/AGG()/ATTR() ignored).
+  // Members missing from rowOrder/colOrder are appended in the order they first appear.
+  function toMatrix(table, m) {
+    var cols = table.columns;
+    function find(want) {
+      var w = norm(want).toLowerCase();
+      return cols.findIndex(function (c) { return norm(cleanHeader(c.fieldName)).toLowerCase() === w; });
+    }
+    var iR = find(m.rows), iC = find(m.cols), iVal = find(m.value);
+    var iN = cols.findIndex(function (c) { return c.fieldName === 'Measure Names'; });
+    var iV = cols.findIndex(function (c) { return c.fieldName === 'Measure Values'; });
+    var useMV = iVal < 0 && iN >= 0 && iV >= 0;
+    if (iR < 0 || iC < 0 || (iVal < 0 && !useMV)) {
+      throw new Error('Matrix fields not found (rows="' + m.rows + '", cols="' + m.cols + '", value="' + m.value +
+        '"). Columns returned: ' + cols.map(function (c) { return c.fieldName; }).join(' | '));
+    }
+    var rowSeen = [], colSeen = [], cell = {};
+    table.data.forEach(function (r) {
+      if (useMV && norm(text(r[iN])).toLowerCase() !== norm(m.value).toLowerCase()) return;
+      var rk = text(r[iR]), ck = text(r[iC]);
+      if (rowSeen.indexOf(rk) < 0) rowSeen.push(rk);
+      if (colSeen.indexOf(ck) < 0) colSeen.push(ck);
+      cell[rk + '\u0001' + ck] = text(r[useMV ? iV : iVal]);
+    });
+    function arrange(order, seen) {
+      return (order || []).filter(function (x) { return seen.indexOf(x) >= 0; })
+        .concat(seen.filter(function (x) { return (order || []).indexOf(x) < 0; }));
+    }
+    var rows = arrange(m.rowOrder, rowSeen), fcols = arrange(m.colOrder, colSeen);
+    return {
+      header: [m.corner || m.rows].concat(fcols),
+      rows: rows.map(function (rk) {
+        return [rk].concat(fcols.map(function (ck) { var v = cell[rk + '\u0001' + ck]; return v == null ? '' : v; }));
+      })
+    };
+  }
+
   // table = { columns: [{fieldName, dataType}], data: [[{value, formattedValue}, ...], ...] }
   function toWide(table, opts) {
     opts = opts || {};
+    if (opts.layout && opts.layout.matrix) return toMatrix(table, opts.layout.matrix);
     var order = (opts.measureOrder !== undefined ? opts.measureOrder : MEASURE_ORDER).map(norm);
     var cols = table.columns;
     var iN = cols.findIndex(function (c) { return c.fieldName === 'Measure Names'; });
