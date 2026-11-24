@@ -17,6 +17,7 @@
            trimTime: ['Submission Date']
     },
     'Highlight Table': {
+      xlsx: true,
       matrix: {
         rows: 'Offense',                 // field on Rows
         cols: 'Factor',                  // field on Columns
@@ -70,13 +71,15 @@
       throw new Error('Matrix fields not found (rows="' + m.rows + '", cols="' + m.cols + '", value="' + m.value +
         '"). Columns returned: ' + cols.map(function (c) { return c.fieldName; }).join(' | '));
     }
-    var rowSeen = [], colSeen = [], cell = {};
+    var rowSeen = [], colSeen = [], cell = {}, rawCell = {};
     table.data.forEach(function (r) {
       if (useMV && norm(text(r[iN])).toLowerCase() !== norm(m.value).toLowerCase()) return;
       var rk = text(r[iR]), ck = text(r[iC]);
       if (rowSeen.indexOf(rk) < 0) rowSeen.push(rk);
       if (colSeen.indexOf(ck) < 0) colSeen.push(ck);
       cell[rk + '\u0001' + ck] = text(r[useMV ? iV : iVal]);
+      var rv = r[useMV ? iV : iVal], nv = rv && rv.value !== '' && rv.value != null ? Number(rv.value) : NaN;
+      rawCell[rk + '\u0001' + ck] = isFinite(nv) ? nv : null;
     });
     function arrange(order, seen) {
       return (order || []).filter(function (x) { return seen.indexOf(x) >= 0; })
@@ -87,6 +90,9 @@
       header: [m.corner || m.rows].concat(fcols),
       rows: rows.map(function (rk) {
         return [rk].concat(fcols.map(function (ck) { var v = cell[rk + '\u0001' + ck]; return v == null ? '' : v; }));
+      }),
+      raw: rows.map(function (rk) {
+        return [null].concat(fcols.map(function (ck) { var v = rawCell[rk + '\u0001' + ck]; return v == null ? null : v; }));
       })
     };
   }
