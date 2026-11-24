@@ -6,6 +6,7 @@
 <!-- Host a copy of this file next to index.html if your network blocks the CDN, and change the src. -->
 <script src="https://cdn.jsdelivr.net/gh/tableau/extensions-api/lib/tableau.extensions.1.latest.js"></script>
 <script src="pivot.js"></script>
+<script src="xlsx.js"></script>
 <style>
   html, body { margin: 0; height: 100%; background: transparent; font: 12px "Segoe UI", Arial, sans-serif; }
   #btn { all: unset; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
@@ -76,6 +77,14 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
 
+  function saveXlsx(name, bytes) {
+    var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  }
+
   function run() {
     say('');
     var ws = byName(S().get('sheet'));
@@ -88,7 +97,9 @@
       if (r[1]) wide = CsvPivot.appendTotals(wide, CsvPivot.toWide(r[1]), S().get('label') || 'All');
       var d = new Date(), pad = function (n) { return ('0' + n).slice(-2); };
       var stamp = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-      save((S().get('fname') || ws.name) + '_' + stamp + '.csv', CsvPivot.toCsv(wide));
+      var lay = CsvPivot.LAYOUTS[ws.name], base = (S().get('fname') || ws.name) + '_' + stamp;
+      if (lay && lay.xlsx) saveXlsx(base + '.xlsx', CsvXlsx.build(wide, { sheetName: ws.name }));
+      else save(base + '.csv', CsvPivot.toCsv(wide));
     }).catch(function (e) { say('Export failed: ' + (e && e.message || e)); console.error(e); });
   }
 
