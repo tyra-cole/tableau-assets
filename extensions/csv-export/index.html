@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Download CSV</title>
+<!-- Host a copy of this file next to index.html if your network blocks the CDN, and change the src. -->
+<script src="https://cdn.jsdelivr.net/gh/tableau/extensions-api/lib/tableau.extensions.1.latest.js"></script>
+<script src="pivot.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; font: 12px "Segoe UI", Arial, sans-serif; }
+  #btn { all: unset; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+  #btn:hover img { transform: scale(1.1); }
+  #btn:focus-visible { outline: 2px solid #1f77b4; }
+  img { width: 80%; height: 80%; object-fit: contain; transition: transform .1s; }
+  #cfg { display: none; padding: 8px; }
+  #cfg label { display: block; margin: 6px 0 2px; font-weight: 600; }
+  #cfg select, #cfg input { width: 100%; box-sizing: border-box; }
+  #cfg button { margin-top: 8px; }
+  #msg { position: absolute; left: 2px; bottom: 0; font-size: 10px; color: #b00020; }
+</style>
+</head>
+<body>
+<button id="btn" title="Download CSV" aria-label="Download CSV">
+    <img src="download3.png" alt="" aria-hidden="true">
+</button>
+
+<div id="cfg">
+  <label for="sheet">Worksheet to export</label><select id="sheet"></select>
+  <label for="totals">Totals sheet (optional)</label><select id="totals"></select>
+  <label for="label">Totals row label</label><input id="label" value="All">
+  <label for="fname">File name (no extension)</label><input id="fname">
+  <button id="save">Save</button>
+</div>
+<div id="msg"></div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var S = function () { return tableau.extensions.settings; };
+
+  function sheets() { return tableau.extensions.dashboardContent.dashboard.worksheets; }
+  function byName(n) { return sheets().find(function (w) { return w.name === n; }); }
+  function say(t) { $('msg').textContent = t || ''; }
+
+  function showConfig() {
+    var main = $('sheet'), tot = $('totals');
+    main.innerHTML = ''; tot.innerHTML = '<option value="">(none)</option>';
+    sheets().forEach(function (w) {
+      main.add(new Option(w.name, w.name)); tot.add(new Option(w.name, w.name));
+    });
+    main.value = S().get('sheet') || main.options[0].value;
+    tot.value = S().get('totals') || '';
+    $('label').value = S().get('label') || 'All';
+    $('fname').value = S().get('fname') || main.value;
+    $('cfg').style.display = 'block'; $('btn').style.display = 'none';
+  }
+
+  function readSheet(ws) {
+    return ws.getSummaryDataReaderAsync(10000, { ignoreSelection: true }).then(function (reader) {
+      var columns = [], rows = [], p = Promise.resolve();
+      for (var i = 0; i < reader.pageCount; i++) (function (n) {
+        p = p.then(function () { return reader.getPageAsync(n); }).then(function (pg) {
+          columns = pg.columns; rows = rows.concat(pg.data);
+        });
+      })(i);
+      return p.then(function () { return reader.releaseAsync(); })
+              .then(function () { return { columns: columns, data: rows }; });
+    });
+  }
+
+  function save(name, csv) {
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  }
+
+  function run() {
+    say('');
+    var ws = byName(S().get('sheet'));
+    if (!ws) { say('Not configured'); return; }
+    var totName = S().get('totals');
+    var jobs = [readSheet(ws)];
+    if (totName && byName(totName)) jobs.push(readSheet(byName(totName)));
+    Promise.all(jobs).then(function (r) {
+      var wide = CsvPivot.toWide(r[0], { layout: CsvPivot.LAYOUTS[ws.name] });
+      if (r[1]) wide = CsvPivot.appendTotals(wide, CsvPivot.toWide(r[1]), S().get('label') || 'All');
+      var d = new Date(), pad = function (n) { return ('0' + n).slice(-2); };
+      var stamp = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      save((S().get('fname') || ws.name) + '_' + stamp + '.csv', CsvPivot.toCsv(wide));
+    }).catch(function (e) { say('Export failed: ' + (e && e.message || e)); console.error(e); });
+  }
+
+  $('save').onclick = function () {
+    S().set('sheet', $('sheet').value); S().set('totals', $('totals').value);
+    S().set('label', $('label').value); S().set('fname', $('fname').value);
+    S().saveAsync().then(function () {
+      $('cfg').style.display = 'none'; $('btn').style.display = 'flex';
+      $('btn').title = 'Download CSV: ' + $('sheet').value;
+    });
+  };
+  $('btn').onclick = run;
+
+  tableau.extensions.initializeAsync({ configure: showConfig }).then(function () {
+    if (S().get('sheet')) $('btn').title = 'Download CSV: ' + S().get('sheet'); else showConfig();
+  });
+})();
+</script>
+</body>
+</html>
