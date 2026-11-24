@@ -71,7 +71,11 @@
 
     return {
       header: keyIdx.map(function (i) { return cleanHeader(cols[i].fieldName); }).concat(ordered),
-      rows: groups.map(function (g) {
+      rows: groups.slice().sort(function (a, b) {
+        var ta = a.key[0] === 'All', tb = b.key[0] === 'All';   // keep a total row last
+        if (ta !== tb) return ta ? 1 : -1;
+        return a.key.join('\u0001').localeCompare(b.key.join('\u0001'), undefined, { sensitivity: 'base', numeric: true });
+      }).map(function (g) {
         return g.key.concat(ordered.map(function (n) {
           return direct[n] !== undefined ? text(g.row[direct[n]])
                : (g.vals[n] !== undefined ? g.vals[n] : '');
